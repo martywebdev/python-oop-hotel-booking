@@ -1,4 +1,5 @@
 # import csv
+from numpy import number
 import pandas as pd
 
 df = pd.read_csv('hotels.csv')
@@ -33,6 +34,19 @@ class ReservationTicket:
         return content
 
 
+class CreditCard:
+
+    def __init__(self, credit_number, cards_file="cards.csv"):
+        self.credit_number = credit_number
+        self.df = pd.read_csv(cards_file, dtype=str).to_dict(
+            orient='records')  # list of objects structure all string
+
+    def validate(self, expiration, holder, cvc):
+        card_data = {"number": self.credit_number,
+                     "expiration": expiration, "holder": holder, "cvc": cvc}
+        return card_data in self.df
+
+
 while True:
     print(df)
     try:
@@ -43,12 +57,25 @@ while True:
         hotel = Hotel(hotel_id)
 
         if hotel.available():
-            hotel.book()
-            name = input("Enter your name: ")
-            reservation_ticket = ReservationTicket(name, hotel)
-            print(reservation_ticket.generate())
+            # get user's credit card info
+
+            credit_card_input = input("Enter credit card number: ")
+            credit_card = CreditCard(
+                credit_number=credit_card_input)
+
+            # print(credit_card.__dict__) show object properties
+            # print(dir(CreditCard)) show attributes
+
+            # print(credit_card.validate(expiration="12/26", holder='JOHN SMITH', cvc="123"))
+
+            if credit_card.validate(expiration="12/26", holder='JOHN SMITH', cvc="123"):
+                hotel.book()
+                name = input("Enter your name: ")
+                reservation_ticket = ReservationTicket(name, hotel)
+                print(reservation_ticket.generate())
+            else:
+                print('An error occured on your credit card ')
         else:
             print('Not available')
     except (IndexError, ValueError) as e:
         print(e)
-        
