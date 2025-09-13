@@ -3,6 +3,7 @@ from numpy import number
 import pandas as pd
 
 df = pd.read_csv('hotels.csv')
+df_authenticate = pd.read_csv('card_security.csv',dtype=str)
 # with open('hotels.csv', 'r', newline='', encoding='utf-8') as f:
 #     hotels = csv.DictReader(f)
 
@@ -30,7 +31,10 @@ class ReservationTicket:
     def generate(self):
         row = df.loc[df['id'] == int(
             self.hotel_object.hotel_id)].iloc[0]
-        content = f'{self.customer_name} on {row['name']}'
+        content = f'''
+        {self.customer_name} 
+        reservation on 
+        {row['name']}'''
         return content
 
 
@@ -47,6 +51,20 @@ class CreditCard:
         return card_data in self.df
 
 
+class SecureCreditCard(CreditCard):
+
+    def authenticate(self, given_password):
+        # for card in df_authenticate:
+        #     if card['password'] == given_password and card['number'] == self.credit_number:
+        #         return True  # Found a match
+        # return False  # No match found
+        try:
+            password = df_authenticate.loc[df_authenticate['number'] == self.credit_number, 'password'].squeeze()
+            return password == given_password
+        except KeyError:
+            return False  # Credit card number not found
+
+
 while True:
     print(df)
     try:
@@ -60,21 +78,26 @@ while True:
             # get user's credit card info
 
             credit_card_input = input("Enter credit card number: ")
-            credit_card = CreditCard(
-                credit_number=credit_card_input)
+            credit_card = SecureCreditCard(
+                credit_number=credit_card_input.strip())
 
             # print(credit_card.__dict__) show object properties
             # print(dir(CreditCard)) show attributes
 
             # print(credit_card.validate(expiration="12/26", holder='JOHN SMITH', cvc="123"))
+            password = input('Enter your card password ')
 
-            if credit_card.validate(expiration="12/26", holder='JOHN SMITH', cvc="123"):
-                hotel.book()
-                name = input("Enter your name: ")
-                reservation_ticket = ReservationTicket(name, hotel)
-                print(reservation_ticket.generate())
+            if credit_card.authenticate(given_password=password.strip()):
+
+                if credit_card.validate(expiration="12/26", holder='JOHN SMITH', cvc="123"):
+                    hotel.book()
+                    name = input("Enter your name: ")
+                    reservation_ticket = ReservationTicket(name, hotel)
+                    print(reservation_ticket.generate())
+                else:
+                    print('An error occured on your credit card ')
             else:
-                print('An error occured on your credit card ')
+                print("Invalid Password ")
         else:
             print('Not available')
     except (IndexError, ValueError) as e:
