@@ -3,7 +3,7 @@ from numpy import number
 import pandas as pd
 
 df = pd.read_csv('hotels.csv')
-df_authenticate = pd.read_csv('card_security.csv',dtype=str)
+df_authenticate = pd.read_csv('card_security.csv', dtype=str)
 # with open('hotels.csv', 'r', newline='', encoding='utf-8') as f:
 #     hotels = csv.DictReader(f)
 
@@ -20,7 +20,10 @@ class Hotel:
 
     def available(self):
         # return  self.data['available'] == 'yes'
-        return df.loc[df['id'] == int(self.hotel_id), 'available'].squeeze() == 'yes'
+        selection = df.loc[df['id'] == int(self.hotel_id), 'available']
+        if selection.empty:
+            return False  # hotel not found
+        return selection.iloc[0] == 'yes'
 
 
 class ReservationTicket:
@@ -32,9 +35,10 @@ class ReservationTicket:
         row = df.loc[df['id'] == int(
             self.hotel_object.hotel_id)].iloc[0]
         content = f'''
-        {self.customer_name} 
-        reservation on 
-        {row['name']}'''
+        Thank you for your reservation!
+        Here are your booking data:
+        Name: {self.customer_name}
+        Hotel Name:{row['name']}'''
         return content
 
 
@@ -59,17 +63,61 @@ class SecureCreditCard(CreditCard):
         #         return True  # Found a match
         # return False  # No match found
         try:
-            password = df_authenticate.loc[df_authenticate['number'] == self.credit_number, 'password'].squeeze()
-            return password == given_password
-        except KeyError:
-            return False  # Credit card number not found
+            matches = df_authenticate.loc[df_authenticate['number']
+                                          == self.credit_number, 'password']
+            if matches.empty:
+                return False  # Credit card number not found
+            stored_password = matches.iloc[0]  # safely grab first match
+            return stored_password == given_password
+        except Exception:
+            return False
+
+
+class SpaReservation:
+
+    def __init__(self, name, hotel):
+        self.name = name
+        self.hotel = hotel
+
+    def generate(self):
+        # assuming self.hotel is a Hotel object
+        hotel_id = int(self.hotel.hotel_id)
+
+        # filter the DataFrame for this hotel
+        hotel_info = df.loc[df['id'] == hotel_id]
+
+        if hotel_info.empty:
+            print("Hotel not found")
+            return
+
+        # Convert to dict (first row only)
+        hotel_data = hotel_info.iloc[0].to_dict()
+
+        # print reservation info
+        content = f'''
+                Thank you for your reservation!
+                Here are your booking data:
+                Name: {self.name}
+                Hotel Name:{hotel_data['name']}'''
+        return content
+
+
+class QuitBooking(Exception):
+    pass
+
+
+def ask(prompt):
+    value = input(prompt).strip()
+    if value.lower() == 'q':
+        raise QuitBooking()
+    return value
 
 
 while True:
     print(df)
     try:
 
-        hotel_id = input("Enter the id of the hotel: ")
+        hotel_id = ask("Enter the id of the hotel (or 'q' to quit): ")
         if hotel_id == 'q':
             break
         hotel = Hotel(hotel_id)
@@ -77,7 +125,7 @@ while True:
         if hotel.available():
             # get user's credit card info
 
-            credit_card_input = input("Enter credit card number: ")
+            credit_card_input = ask("Enter credit card number: ")
             credit_card = SecureCreditCard(
                 credit_number=credit_card_input.strip())
 
@@ -85,20 +133,41 @@ while True:
             # print(dir(CreditCard)) show attributes
 
             # print(credit_card.validate(expiration="12/26", holder='JOHN SMITH', cvc="123"))
-            password = input('Enter your card password ')
+            password = ask("Enter your card password: ")
 
             if credit_card.authenticate(given_password=password.strip()):
 
                 if credit_card.validate(expiration="12/26", holder='JOHN SMITH', cvc="123"):
-                    hotel.book()
-                    name = input("Enter your name: ")
+                    # hotel.book()
+                    name = ask("Enter your name: ")
                     reservation_ticket = ReservationTicket(name, hotel)
                     print(reservation_ticket.generate())
+
+                    while True:
+
+                        spa_offer_input = ask(
+                            "Do you want to book a spa package? (yes/no): ").lower()
+                        if spa_offer_input in ['yes', 'no']:
+                            spa_offer = spa_offer_input == 'yes'  # Convert 'yes'/'no' to boolean
+
+                            break
+                        print("Invalid input. Please enter 'yes' or 'no'.")
+
+                        # for testing purposes
+                    if spa_offer:
+                        spa_reservation = SpaReservation(
+                            hotel=hotel, name=name)
+
+                        spa_reservation.generate()
+
                 else:
                     print('An error occured on your credit card ')
             else:
                 print("Invalid Password ")
         else:
-            print('Not available')
+            print('Not Found')
+    except QuitBooking:
+        print("Booking process exited by user.")
+        break
     except (IndexError, ValueError) as e:
         print(e)
